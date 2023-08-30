@@ -72,9 +72,11 @@ import matplotlib.pyplot as plt
 import zipfile
 from datetime import datetime
 import glob, os
+import pydeck as pdk
+import numpy as np
 from csv_analysis import csv_analysis
 from image_analysis import image_analysis
-
+from map_visualization import map_visualization
 # Define paths for model checkpoints and configurations
 checkpoint_path_swin = '/home/pms/pms/pms-code/ipsci-script/checkpoints-30052023/10-class/20230428-105301-swinv2_base_window12to24_192to384_22kft1k-384/last.pth.tar'
 config_deeplabv3plus = "/home/pms/pms/pms-code/ipsci-script/checkpoints-1/deeplabv3plus_r50-d8_512x512_160k_new/deeplabv3plus_r50b-d8_4xb2-160k_roadsurvey-512x512.py"
@@ -149,7 +151,7 @@ def main():
     # Only show the dropdown if both checkboxes are ticked
     if checkpoint_confirmed and config_confirmed:
         # Ask the user for the type of analysis or to view the help
-        analysis_type = st.selectbox("Select an option:", [" ","Help", "Image Analysis", "CSV Data Analysis"])
+        analysis_type = st.selectbox("Select an option:", [" ", "Help", "Image Analysis", "CSV Data Analysis", "Map Visualization"])
 
         if analysis_type == "Image Analysis":
             image_analysis()
@@ -157,6 +159,8 @@ def main():
             csv_analysis()
         elif analysis_type == "Help":
             display_help()
+        elif analysis_type == "Map Visualization":
+            map_visualization()
     else:
         st.warning("Please confirm the paths for checkpoints and configurations to proceed.")
 

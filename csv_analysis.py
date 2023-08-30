@@ -9,6 +9,7 @@ import plotly.graph_objects as go
 import re
 import os
 import base64
+from datetime import datetime
 #===============================================
 def extract_chainage(image_name):
     """
@@ -20,10 +21,18 @@ def extract_chainage(image_name):
     Returns:
     - The chainage value as a float or None if not found.
     """
-    # Use a regular expression to extract the chainage value
+    # Use a regular expression to extract the chainage value for the format "LOOP1A 0000.000 1.jpg"
     match = re.search(r' (\d+\.\d+) ', image_name)
     if match:
         return float(match.group(1))
+
+    # Use a regular expression to extract the chainage value for the format "LOOP1A 0000000.jpg"
+    match = re.search(r' (\d{7})\.jpg$', image_name)
+    if match:
+        # Convert the extracted value to the float format
+        chainage_str = match.group(1)
+        return float(chainage_str)/1000
+
     return None
 #=================================================
 def apply_filters(data, filter_type, window_size):
@@ -71,8 +80,33 @@ def apply_filters(data, filter_type, window_size):
     # If no filter is matched, return the original data.
     else:
         return data
-
 #=================================================
+#This function is used if the chainage is in this format i.e. 0000.000
+# do not use it if 0000000 format is used.
+def format_chainage(chainage_float):
+    # Format the float to have three digits after the decimal point
+    formatted_str = "{:.3f}".format(chainage_float)
+    # Replace the decimal point
+    formatted_str = formatted_str.replace('.', '')
+    # Convert back to float and return
+    return float(formatted_str)
+#=================================================
+def determine_chainage_format(chainage):
+    """
+    Determine the format of the chainage value and format it accordingly.
+
+    Parameters:
+    - chainage: The chainage value extracted from the image name.
+
+    Returns:
+    - The formatted chainage value.
+    """
+    # If the chainage contains a decimal point, format it
+    if "." in str(chainage):
+        return format_chainage(chainage)
+    return chainage
+#=================================================
+
 def analyze_data(df, prob_threshold, window_size, section_size, filter_type, x_axis_type, folder_path):
     """
     Analyze the data based on user-defined parameters and chosen filter.
@@ -88,9 +122,11 @@ def analyze_data(df, prob_threshold, window_size, section_size, filter_type, x_a
 
     Displays:
     - An interactive plot showing the most common pavement rating for each section.
+    - A dropdown to select the desired CSV format.
+    - A button to save the data to CSV.
     """
 
-    # If the probability is less than the user-defined threshold, use the previous rating
+    # Adjust predictions based on probability threshold
     df['Adjusted Prediction 1'] = df['Prediction 1'].where(df['Probability 1'] >= prob_threshold, df['Prediction 1'].shift())
 
     # Apply the chosen filter
@@ -136,43 +172,60 @@ def analyze_data(df, prob_threshold, window_size, section_size, filter_type, x_a
     # Display the plot in Streamlit
     st.plotly_chart(fig)
 
+    # Dropdown to select the desired CSV format
+    csv_format = st.selectbox("Choose CSV Format:", ["Summary", "Full Ratings"])
+
     # Button to save the data to CSV
     if st.button("Save Data to CSV"):
-        # Compute the specified information
-        csv_data = {
-            "Most Common Rating": [],
-            "Start Image Index": [],
-            "End Image Index": [],
-            "Start Image Name": [],
-            "End Image Name": []
-        }
+        if csv_format == "Summary":
+            # Logic for saving in current saved format
+            csv_data = {
+                "Most Common Rating": [],
+                "Start Image Index": [],
+                "End Image Index": [],
+                "Start Image Name": [],
+                "End Image Name": []
+            }
 
-        for i in range(0, len(df), section_size):
-            section_end = min(i + section_size, len(df))
-            mode_series = df.iloc[i:section_end]['Smoothed Prediction'].mode()
-            most_common_rating = mode_series.iloc[0] if not mode_series.empty else df.iloc[i]['Smoothed Prediction']
+            for i in range(0, len(df), section_size):
+                section_end = min(i + section_size, len(df))
+                mode_series = df.iloc[i:section_end]['Smoothed Prediction'].mode()
+                most_common_rating = mode_series.iloc[0] if not mode_series.empty else df.iloc[i]['Smoothed Prediction']
 
-            csv_data["Most Common Rating"].append(most_common_rating)
-            csv_data["Start Image Index"].append(i)
-            csv_data["End Image Index"].append(section_end - 1)  # -1 because it's inclusive
-            csv_data["Start Image Name"].append(df.iloc[i]['Image Name'])
-            csv_data["End Image Name"].append(df.iloc[section_end - 1]['Image Name'])
+                csv_data["Most Common Rating"].append(most_common_rating)
+                csv_data["Start Image Index"].append(i)
+                csv_data["End Image Index"].append(section_end - 1)  # -1 because it's inclusive
+                csv_data["Start Image Name"].append(df.iloc[i]['Image Name'])
+                csv_data["End Image Name"].append(df.iloc[section_end - 1]['Image Name'])
+        else:
+    # New logic for the CSV format
+            csv_data = {
+                "Image Index": list(df.index),
+                "Image Name": list(df['Image Name']),
+                "Chainage": [determine_chainage_format(val) for val in df['Image Name'].apply(extract_chainage)],
+                "Image Rating": most_common_ratings
+            }
 
-        # Convert the dictionary to a DataFrame and save as CSV
+            # Ensure all columns have the same length
+            max_len = max(len(lst) for lst in csv_data.values())  # Find the maximum length among all lists
+
+            for key, lst in csv_data.items():
+                if len(lst) < max_len:
+                    # Determine the appropriate placeholder based on the data type
+                    placeholder = ' ' if isinstance(lst[0], str) else -1
+                    # Extend the list with the placeholder value
+                    lst.extend([placeholder] * (max_len - len(lst))) 
+            
         output_csv_name = "output_data.csv"
         output_path = os.path.join(folder_path, output_csv_name)
         output_df = pd.DataFrame(csv_data)
         output_df.to_csv(output_path, index=False)
-
+        
         # Generate a URL link for downloading the CSV file
         csv_url = f"http://192.168.1.65:8502/{os.path.basename(folder_path)}/{output_csv_name}"
         st.markdown(f"[Download the CSV file here]({csv_url})")
 
 #=================================================
-from datetime import datetime
-
-from datetime import datetime
-
 def csv_analysis():
     """Main function for Streamlit app."""
     st.title("Pavement Rating Analysis")
@@ -214,53 +267,3 @@ def csv_analysis():
             analyze_data(df, prob_threshold, window_size, section_size, filter_type, x_axis_type, st.session_state.csv_analysis_temp_dir)
         else:
             st.error("The uploaded CSV file does not have the required columns.")
-
-
-'''
-IMPORT necessary libraries
-
-FUNCTION extract_chainage(image_name):
-    - Use regular expression to extract chainage value from image name
-    - RETURN chainage value if found, otherwise RETURN None
-
-FUNCTION apply_filters(data, filter_type, window_size):
-    - IF filter_type is "Moving Average":
-        - Apply moving average filter to data
-    - ELSE IF filter_type is "Exponential Moving Average":
-        - Apply exponential moving average filter to data
-    - ELSE IF filter_type is "Gaussian Filter":
-        - Apply Gaussian filter to data
-    - ELSE IF filter_type is "Median Filter":
-        - Adjust window size if even
-        - Apply median filter to data
-    - ELSE:
-        - RETURN original data
-
-FUNCTION analyze_data(df, prob_threshold, window_size, section_size, filter_type, x_axis_type, folder_path):
-    - Adjust predictions based on probability threshold
-    - Apply chosen filter to data
-    - Determine most common rating for each section size
-    - Determine x-axis values based on user's choice
-    - Create interactive plot using Plotly
-    - Display plot in Streamlit
-    - IF user clicks "Save Data to CSV" button:
-        - Compute specified information for CSV
-        - Save data to CSV file
-        - Generate a URL link for downloading the CSV file
-
-FUNCTION csv_analysis():
-    - Display Streamlit app title
-    - Define user-defined parameters using Streamlit sidebar
-    - Allow user to upload a CSV file
-    - IF a CSV file is uploaded:
-        - Define base directory for saving uploaded CSV file
-        - IF unique_temp_dir is not in session state:
-            - Create a unique directory based on current timestamp
-            - Save uploaded CSV file to unique directory
-        - Read CSV file from unique directory
-        - IF CSV file has required columns:
-            - Call analyze_data function
-        - ELSE:
-            - Display error message in Streamlit
-
-'''
