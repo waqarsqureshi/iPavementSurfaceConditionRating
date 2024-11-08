@@ -21,6 +21,15 @@ from util import get_palette, get_classes
 from mmseg.apis import inference_model, init_model
 import zipfile
 import shutil
+
+import socket
+import netifaces
+import threading
+import shutil
+
+SEGMENTED_FOLDER_NAME = "seg_images"
+CROPPED_FOLDER_NAME = "crop_images"
+
 #=========================
 from PIL import ImageFont
 
@@ -147,7 +156,7 @@ def classify_image(image_path, model, device):
 #============================================================
 #This function is to process image 1 by 1
 def classify2(folder_path, model, device):
-        images = [f for f in glob.glob(os.path.join(folder_path, '**', '*.[pjP][npP][gG]*'), recursive=True)]
+        images = [f for f in glob.glob(os.path.join(folder_path, '**', '*.[pjPJ][npP][gG]*'), recursive=True)]
         # Sort the image paths
         images.sort()
         if folder_path:                
@@ -230,7 +239,12 @@ def update_progress_bar(progress_bar, current_index, total_images):
 #============================================================
 def display_results(images, folder_path):
     # Dropdown to select an image
-    selected_image_index = st.selectbox("Select an image to view its result:", list(range(len(images))))
+    image_names = [os.path.basename(image) for image in images]  # Extracting only the image names
+
+    selected_image_name = st.selectbox("Choose an image:", image_names)
+    selected_image_index = image_names.index(selected_image_name)       
+    
+    #selected_image_index = st.selectbox("Select an image to view its result:", list(range(len(images))))
     
     if selected_image_index in st.session_state.indices:
         idx = st.session_state.indices.index(selected_image_index)
@@ -244,6 +258,7 @@ def display_results(images, folder_path):
         st.image(image_with_classes, caption=image_name)
     else:
         st.write("Image is not processed yet.")
+
 
 #============================================================
 def plot_predictions():
@@ -271,16 +286,15 @@ def save_to_csv(folder_path):
                 row = [image_name] + [item for sublist in top3 for item in sublist]
                 writer.writerow(row)
         st.success(f"Results saved to {os.path.basename(csv_filename)}")
-        csv_url = f"http://192.168.1.65:8502/{os.path.basename(folder_path)}/{os.path.basename(csv_filename)}"
+        csv_url = f"http://192.168.1.80:8502/temp/{os.path.basename(folder_path)}/{os.path.basename(csv_filename)}"
         st.markdown(f"[Download CSV File]({csv_url})")
 #==========================================================
 def classify(folder_path, model, device):
     # Check if the folder path is valid
     if folder_path:
         # Get all image paths from the folder
-        images = [f for f in glob.glob(os.path.join(folder_path, '**', '*.[pjP][npP][gG]*'), recursive=True)]
+        images = [f for f in glob.glob(os.path.join(folder_path, '**', '*.[pjPJ][npP][gG]*'), recursive=True)]
         images.sort()
-
         # Initialize session state variables if they don't exist
         if 'image_index' not in st.session_state:
             st.session_state.image_index = 0
@@ -338,7 +352,7 @@ def gradCam(folder_path, model, device):
 
     if folder_path:
         if os.path.isdir(folder_path):
-            images = [f for f in glob.glob(os.path.join(folder_path, '**', '*.[pjP][npP][gG]*'), recursive=True)]
+            images = [f for f in glob.glob(os.path.join(folder_path, '**', '*.[pjPJ][npP][gG]*'), recursive=True)]
             # Sort the image paths
             images.sort()
             image_names = [os.path.basename(image) for image in images]  # Extracting only the image names
@@ -416,6 +430,8 @@ def readImage_576x720(path):
     elif image.shape[:2] == (632,720):
         orig = np.zeros((576, 720, 3), np.uint8)
         orig  = image [56:632,0:720]
+    elif image.shape[:2] == (1080,1920):
+        orig = cv2.resize(image,(720,576))
     else:
         orig = cv2.resize(image,(720, 576)) #(w,h) always remember cv2 takes width and height and numpy use height and width
     return orig
@@ -497,7 +513,7 @@ def process_all_images(folder_path, model, seg_save_folder, crop_save_folder, th
     """
     
     # Fetch all image paths from the folder
-    images = [f for f in glob.glob(os.path.join(folder_path, '**', '*.[pjP][npP][gG]*'), recursive=True)]
+    images = [f for f in glob.glob(os.path.join(folder_path, '**', '*.[pjPJ][npP][gG]*'), recursive=True)]
     total_images = len(images)
     
     # Create a progress bar in Streamlit for user feedback
@@ -528,20 +544,16 @@ def process_all_images(folder_path, model, seg_save_folder, crop_save_folder, th
     st.session_state.current_image_index = 0
     st.session_state.stop_processing = False
     progress_bar.progress(0)
+    
+    # Create zip files for segmented and cropped images
+    base_folder = os.path.basename(folder_path)
+    seg_zip_name = os.path.join(folder_path, base_folder, "seg_images.zip")
+    crop_zip_name = os.path.join(folder_path, base_folder, "crop_images.zip")
+    create_directory(os.path.join(folder_path, base_folder))
+    create_zip_file(seg_save_folder, seg_zip_name)
+    create_zip_file(crop_save_folder, crop_zip_name)
 
-    # Zip the segmented and cropped folders separately for user to download
-    seg_zip_name = os.path.join(folder_path, "seg_images.zip")
-    crop_zip_name = os.path.join(folder_path, "crop_images.zip")
-    shutil.make_archive(seg_zip_name[:-4], 'zip', seg_save_folder)
-    shutil.make_archive(crop_zip_name[:-4], 'zip', crop_save_folder)
-
-    # Provide download links for both zipped folders
-    seg_zip_url = f"http://192.168.1.65:8502/{os.path.basename(folder_path)}/{os.path.basename(seg_zip_name)}"
-    crop_zip_url = f"http://192.168.1.65:8502/{os.path.basename(folder_path)}/{os.path.basename(crop_zip_name)}"
-
-    return seg_zip_url, crop_zip_url
-
-#===========================================================
+    return seg_zip_name, crop_zip_name
 
 #==========================================================
 def save(segImg_path, cropImg_path, path, args, segImage, orig):
@@ -560,6 +572,54 @@ def save(segImg_path, cropImg_path, path, args, segImage, orig):
     cv2.imwrite(cropImg_path, orig)
 
 #===========================================================
+# Pavement Extraction Module by TU Dublin
+# Written by Waqar Shahid Qureshi
+
+# Set the configuration variables at the top
+THRESHOLD_MIN = 0.0
+THRESHOLD_MAX = 1.0
+THRESHOLD_DEFAULT = 0.10
+THRESHOLD_STEP = 0.01
+PORT = 8502
+
+# Get the local IP address of the system dynamically from wireless or ethernet interfaces
+interfaces = ['eth0', 'wlan0', 'en0']
+IP_ADDRESS = "192.168.1.80"  # Default to localhost if no IP found
+for interface in interfaces:
+    try:
+        ip = netifaces.ifaddresses(interface)[netifaces.AF_INET][0]['addr']
+        if ip:
+            IP_ADDRESS = ip
+            break
+    except (ValueError, KeyError, IndexError):
+        continue
+
+
+
+# Utility function to create directories if they do not exist
+def create_directory(directory_path):
+    """
+    Creates a directory if it does not already exist.
+    
+    Parameters:
+    - directory_path: Path of the directory to be created.
+    """
+    os.makedirs(directory_path, exist_ok=True)
+
+
+# Utility function to create a zip file
+def create_zip_file(source_folder, zip_file_name):
+    """
+    Creates a zip file of the specified folder.
+    
+    Parameters:
+    - source_folder: Path of the folder to be zipped.
+    - zip_file_name: Path of the resulting zip file.
+    """
+    shutil.make_archive(zip_file_name.replace('.zip', ''), 'zip', source_folder)
+
+
+#===========================================================
 def PavementExtraction(folder_path, model, device):
     """
     Streamlit interface for pavement extraction.
@@ -575,10 +635,10 @@ def PavementExtraction(folder_path, model, device):
             threshold_percentage = st.slider("Set the threshold percentage:", min_value=0.0, max_value=1.0, value=0.10, step=0.01)
 
             # Create directories for saving segmented and cropped images
-            seg_save_folder = os.path.join(folder_path, "seg_images")
-            crop_save_folder = os.path.join(folder_path, "crop_images")
-            os.makedirs(seg_save_folder, exist_ok=True)
-            os.makedirs(crop_save_folder, exist_ok=True)
+            seg_save_folder = os.path.join(folder_path, SEGMENTED_FOLDER_NAME)
+            crop_save_folder = os.path.join(folder_path, CROPPED_FOLDER_NAME)
+            create_directory(seg_save_folder)
+            create_directory(crop_save_folder)
 
             # Initialize session state variables if they don't exist
             if 'current_image_index' not in st.session_state:
@@ -589,13 +649,27 @@ def PavementExtraction(folder_path, model, device):
             # Start button to begin processing
             if st.button("Start"):
                 st.session_state.stop_processing = False
-                process_all_images(folder_path, model, seg_save_folder, crop_save_folder, threshold_percentage)
-
+                seg_zip_name, crop_zip_name = process_all_images(folder_path, model, seg_save_folder, crop_save_folder, threshold_percentage)
+            
             # Stop button to halt processing
+            # Provide download links for both zipped folders, if they exist
+                if os.path.exists(seg_zip_name):
+                    seg_zip_url = f"http://{IP_ADDRESS}:{PORT}/temp/{os.path.basename(folder_path)}/{os.path.basename(seg_zip_name)}"
+                    st.markdown(f"[Download Segmented Images]({seg_zip_url})")
+                else:
+                    st.warning("Segmented images zip file does not exist.")
+
+                if os.path.exists(crop_zip_name):
+                    crop_zip_url = f"http://{IP_ADDRESS}:{PORT}/temp/{os.path.basename(folder_path)}/{os.path.basename(crop_zip_name)}"
+                    st.markdown(f"[Download Cropped Images]({crop_zip_url})")
+                else:
+                    st.warning("Cropped images zip file does not exist.")
+
+    # Stop button to halt processing
             if st.button("Stop"):
                 st.session_state.stop_processing = True
 
-            # After processing all images, allow user to view the processed images
+    # After processing all images, allow user to view the processed images
             segmented_images = [f for f in glob.glob(os.path.join(seg_save_folder, '*.[pjP][npP][gG]*'))]
             if segmented_images:
                 # Check if 'selected_image' is already in the session state
@@ -604,25 +678,7 @@ def PavementExtraction(folder_path, model, device):
 
                 # Dropdown for user to select an image to view
                 st.session_state.selected_image = st.selectbox("Select an image to view:", segmented_images, index=segmented_images.index(st.session_state.selected_image))
-    
+
                 # Display the segmented version of the selected image
-                seg_image_path = os.path.join(st.session_state.selected_image)
+                seg_image_path = st.session_state.selected_image
                 st.image(seg_image_path, caption="Segmented Image", use_column_width=True)
-
-            # Provide download links for both zipped folders, if they exist
-            seg_zip_name = os.path.join(folder_path, "seg_images.zip")
-            crop_zip_name = os.path.join(folder_path, "crop_images.zip")
-            
-            if os.path.exists(seg_zip_name):
-                seg_zip_url = f"http://192.168.1.65:8502/{os.path.basename(folder_path)}/{os.path.basename(seg_zip_name)}"
-                st.markdown(f"[Download Segmented Images]({seg_zip_url})")
-            else:
-                st.error("Segmented images zip file does not exist.")
-
-            if os.path.exists(crop_zip_name):
-                crop_zip_url = f"http://192.168.1.65:8502/{os.path.basename(folder_path)}/{os.path.basename(crop_zip_name)}"
-                st.markdown(f"[Download Cropped Images]({crop_zip_url})")
-            else:
-                st.error("Cropped images zip file does not exist.")
-        else:
-            st.error("The folder path is not valid.")

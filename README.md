@@ -1,3 +1,16 @@
+Old Images, S:\Video Surveys\Video Surveys 2023\PSCI QA\cork QA FEB 23\PSCI
+Old Images, S:\Video Surveys\Video Surveys 2023\PSCI QA\Meath QA April 2023\PSCI
+New Images, S:\Video Surveys\Video Surveys 2023\PSCI QA\Meath QA April 2023\PSCI 2
+
+d$(\\2016fs02)
+
+The Linux address translation: smb://2016fs02.pms.local/d$/Video Surveys/Video Surveys 2023/PSCI QA/cork QA FEB 23
+
+The Linux address translation: smb://2016fs02.pms.local/d$/PSCI/ML%20Cork%20CC/WE040323/Jpegs/CORK280223/Cam1
+of the following drive
+of the following drive
+
+
 # Welcome to Streamlit!
 
 Edit `/streamlit_app.py` to customize this app to your heart's desire. :heart:
@@ -54,10 +67,10 @@ Setup & Usage
         Navigate to the temp directory.
         Initiate an HTTP server:
 
-        python3 -m http.server 8502 --bind 192.168.1.65
-    
+        python3 -m http.server 8502 --bind 192.168.1.80
     Launch the Streamlit application:
-    streamlit run streamlit_app.py --server.address 192.168.1.65 --server.port 8501
+       streamlit run streamlit_app.py --server.address 192.168.1.80 --server.port 8503
+       streamlit run streamlit_app.py --server.address 192.168.1.80 --server.port 8503 --server.maxUploadSize=2000
 Dependencies
 
     streamlit: Web application interface.

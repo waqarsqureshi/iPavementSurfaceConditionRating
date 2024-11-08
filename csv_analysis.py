@@ -11,6 +11,8 @@ import os
 import base64
 from datetime import datetime
 #===============================================
+import re
+
 def extract_chainage(image_name):
     """
     Extract the chainage value from the image name.
@@ -21,10 +23,16 @@ def extract_chainage(image_name):
     Returns:
     - The chainage value as a float or None if not found.
     """
-    # Use a regular expression to extract the chainage value for the format "LOOP1A 0000.000 1.jpg"
-    match = re.search(r' (\d+\.\d+) ', image_name)
+    
+    # Use a regular expression to extract the chainage value for the format "130723A 00000025 1.jpg"
+    match = re.search(r' (\d+) \d+\.(jpg|png)$', image_name)
     if match:
-        return float(match.group(1))
+        return float(match.group(1))/1000
+
+    # Use a regular expression to extract the chainage value for the format "LOOP1A 0000.000.jpg"
+    match = re.search(r' (\d+\.\d+)\.(jpg|png)$', image_name)
+    if match:
+        return float(match.group(1))/1000
 
     # Use a regular expression to extract the chainage value for the format "LOOP1A 0000000.jpg"
     match = re.search(r' (\d{7})\.jpg$', image_name)
@@ -34,6 +42,7 @@ def extract_chainage(image_name):
         return float(chainage_str)/1000
 
     return None
+
 #=================================================
 def apply_filters(data, window_size):
     """
@@ -137,7 +146,6 @@ def analyze_data(df, prob_threshold, window_size, section_size, x_axis_type, fol
         most_common_rating = max(weighted_counts, key=weighted_counts.get)
         
         most_common_ratings.extend([most_common_rating] * section_size)
-
 ################################
 
     # Determine x-axis values based on user's choice
@@ -240,7 +248,7 @@ def analyze_data(df, prob_threshold, window_size, section_size, x_axis_type, fol
         output_df.to_csv(output_path, index=False)
         
         # Generate a URL link for downloading the CSV file
-        csv_url = f"http://192.168.1.65:8502/{os.path.basename(folder_path)}/{output_csv_name}"
+        csv_url = f"http://192.168.1.65:8502/temp/{os.path.basename(folder_path)}/{output_csv_name}"
         st.markdown(f"[Download the CSV file here]({csv_url})")
 
 #=================================================
@@ -250,8 +258,8 @@ def csv_analysis():
 
     # User-defined parameters
     prob_threshold = st.sidebar.slider("Probability Threshold (0-1)", 0.2, 1.0, 0.8)
-    window_size = st.sidebar.slider("Median Filter Window Size", 2, 11, 3)
-    section_size = st.sidebar.slider("Section Size for Most Common Rating", 5, 100, 20)
+    window_size = st.sidebar.slider("Median Filter Window Size", 1, 11, 3)
+    section_size = st.sidebar.slider("Section Size for Most Common Rating", 1, 100, 20)
     x_axis_options = ["Image Index", "Distance in KMs"]
     x_axis_type = st.sidebar.selectbox("Choose x-axis type:", x_axis_options)
 

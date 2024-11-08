@@ -64,18 +64,15 @@ def compute_metrics(series1, series2):
     nmi = mutual_info_score(series1, series2)
     st.write(f"Mutual Information: {nmi}")
 
-    # Cross-Correlation Function
-    ccf = correlate(series1, series2, mode='valid')
-    st.write(f"Cross-Correlation Function (peak value): {np.max(ccf)}")
-
     # Cross-Correlation
     cross_correlation = np.corrcoef(series1, series2)[0, 1]
     st.write(f"Cross-Correlation: {cross_correlation}")
+
 #==================================================
     
 def plot_difference(data):
     # Calculate the difference between the two ratings
-    data['Difference'] = data['Image Rating_1'] - data['Image Rating_2']
+    #data['Difference'] = data['Image Rating_1'] - data['Image Rating_2']
 
     # Plotting the difference using Plotly
     fig = go.Figure()
@@ -83,19 +80,19 @@ def plot_difference(data):
     # Plotting the ratings of series 1
     fig.add_trace(go.Scatter(x=data['Chainage'], y=data['Image Rating_1'],
                     mode='lines',
-                    name='Rating 1'))
+                    name='Manual Rating'))
 
     # Plotting the ratings of series 2
     fig.add_trace(go.Scatter(x=data['Chainage'], y=data['Image Rating_2'],
                     mode='lines',
-                    name='Rating 2'))
+                    name='Automated Rating'))
 
     # Plotting the difference
-    fig.add_trace(go.Scatter(x=data['Chainage'], y=data['Difference'],
-                    mode='lines+markers',
-                    name='Difference'))
+    #fig.add_trace(go.Scatter(x=data['Chainage'], y=data['Difference'],
+    #                mode='lines+markers',
+    #                name='Difference'))
 
-    fig.update_layout(title='Difference between Rating 1 and Rating 2',
+    fig.update_layout(title='Difference between Manual Rating(1) and Automated Rating(2)',
                    xaxis_title='Chainage',
                    yaxis_title='Rating / Difference')
 
