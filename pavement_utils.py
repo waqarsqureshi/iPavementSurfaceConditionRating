@@ -546,10 +546,8 @@ def process_all_images(folder_path, model, seg_save_folder, crop_save_folder, th
     progress_bar.progress(0)
     
     # Create zip files for segmented and cropped images
-    base_folder = os.path.basename(folder_path)
-    seg_zip_name = os.path.join(folder_path, base_folder, "seg_images.zip")
-    crop_zip_name = os.path.join(folder_path, base_folder, "crop_images.zip")
-    create_directory(os.path.join(folder_path, base_folder))
+    seg_zip_name = os.path.join(folder_path, "seg_images.zip")
+    crop_zip_name = os.path.join(folder_path, "crop_images.zip")
     create_zip_file(seg_save_folder, seg_zip_name)
     create_zip_file(crop_save_folder, crop_zip_name)
 
@@ -654,13 +652,13 @@ def PavementExtraction(folder_path, model, device):
             # Stop button to halt processing
             # Provide download links for both zipped folders, if they exist
                 if os.path.exists(seg_zip_name):
-                    seg_zip_url = f"http://{IP_ADDRESS}:{PORT}/temp/{os.path.basename(folder_path)}/{os.path.basename(seg_zip_name)}"
+                    seg_zip_url = f"http://{IP_ADDRESS}:{PORT}/{os.path.basename(folder_path)}/{os.path.basename(seg_zip_name)}"
                     st.markdown(f"[Download Segmented Images]({seg_zip_url})")
                 else:
                     st.warning("Segmented images zip file does not exist.")
 
                 if os.path.exists(crop_zip_name):
-                    crop_zip_url = f"http://{IP_ADDRESS}:{PORT}/temp/{os.path.basename(folder_path)}/{os.path.basename(crop_zip_name)}"
+                    crop_zip_url = f"http://{IP_ADDRESS}:{PORT}/{os.path.basename(folder_path)}/{os.path.basename(crop_zip_name)}"
                     st.markdown(f"[Download Cropped Images]({crop_zip_url})")
                 else:
                     st.warning("Cropped images zip file does not exist.")

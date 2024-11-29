@@ -14,9 +14,13 @@ import glob, os
 from pavement_utils import (classify, gradCam, PavementExtraction, initialize_model)
 
 # Define paths for model checkpoints and configurations
-CHECKPOINT_PATH_SWIM = '/home/pms/pms/pms-code/ipsci-script/checkpoints-30052023/10-class/20230428-105301-swinv2_base_window12to24_192to384_22kft1k-384/last.pth.tar'
-CONFIG_DEEPLABV3PLUS = "/home/pms/pms/pms-code/ipsci-script/checkpoints-1/deeplabv3plus_r50-d8_512x512_160k_new/deeplabv3plus_r50b-d8_4xb2-160k_roadsurvey-512x512.py"
-CHECKPOINT_DEEPLABV3PLUS = "/home/pms/pms/pms-code/ipsci-script/checkpoints-1/deeplabv3plus_r50-d8_512x512_160k_new/iter_160000.pth"
+# Set folder paths and server variables from the main Streamlit app
+TEMP_DIR = st.session_state.get('TEMP_DIR', "/home/pms/streamlit-example/temp/")
+SERVER_IP = st.session_state.get('SERVER_IP', "192.168.1.80")
+PORT = st.session_state.get('PORT', 8502)
+CHECKPOINT_PATH_SWIM = st.session_state.get('CHECKPOINT_PATH_SWIM', '/home/pms/pms/pms-code/ipsci-script/checkpoints-30052023/10-class/20230428-105301-swinv2_base_window12to24_192to384_22kft1k-384/last.pth.tar')
+CONFIG_DEEPLABV3PLUS = st.session_state.get('CONFIG_DEEPLABV3PLUS', "/home/pms/pms/pms-code/ipsci-script/checkpoints-1/deeplabv3plus_r50-d8_512x512_160k_new/deeplabv3plus_r50b-d8_4xb2-160k_roadsurvey-512x512.py")
+CHECKPOINT_DEEPLABV3PLUS = st.session_state.get('CHECKPOINT_DEEPLABV3PLUS', "/home/pms-code/ipsci-script/checkpoints-1/deeplabv3plus_r50-d8_512x512_160k_new/iter_160000.pth")
 
 def image_analysis():
     # Define the options for pavement analysis
@@ -28,7 +32,7 @@ def image_analysis():
 
     # If a ZIP file is uploaded
     if uploaded_zip:
-        temp_dir_path = "/home/pms/streamlit-example/temp/"
+        temp_dir_path = TEMP_DIR 
         os.makedirs(temp_dir_path, exist_ok=True)
 
         # Check if the image_analysis_temp_dir is already in the session state
@@ -46,8 +50,9 @@ def image_analysis():
                 st.error("The uploaded file is not a valid ZIP file. Please upload a valid ZIP file.")
 
         # Get the list of images from the extracted ZIP file
-        images = [f for f in glob.glob(os.path.join(st.session_state.image_analysis_temp_dir, '**', '*.[pjPJ][npP][gG]*'), recursive=True)]
-        
+        images = [f for f in glob.glob(os.path.join(st.session_state.image_analysis_temp_dir, '**', '*.[jJ][pP][eE][gG]'), recursive=True)]
+        images += [f for f in glob.glob(os.path.join(st.session_state.image_analysis_temp_dir, '**', '*.[jJ][pP][gG]'), recursive=True)]
+
         # If images are found
         if images:
             # For each option, initialize the model and process the images accordingly
